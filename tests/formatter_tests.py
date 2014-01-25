@@ -43,8 +43,8 @@ class DateTimeFormatterFormatTokenTests(Chai):
         assertEqual(self.formatter._format_token(dt, 'DD'), '01')
         assertEqual(self.formatter._format_token(dt, 'D'), '1')
 
-        assertEqual(self.formatter._format_token(dt, 'dddd'), 'Saturday')
-        assertEqual(self.formatter._format_token(dt, 'ddd'), 'Sat')
+        assertEqual(self.formatter._format_token(dt, 'dddd'), 'Friday')
+        assertEqual(self.formatter._format_token(dt, 'ddd'), 'Fri')
         assertEqual(self.formatter._format_token(dt, 'd'), '5')
 
     def test_hour(self):
@@ -54,8 +54,21 @@ class DateTimeFormatterFormatTokenTests(Chai):
         assertEqual(self.formatter._format_token(dt, 'H'), '2')
 
         dt = datetime(2013, 1, 1, 13)
+        assertEqual(self.formatter._format_token(dt, 'HH'), '13')
+        assertEqual(self.formatter._format_token(dt, 'H'), '13')
+
+        dt = datetime(2013, 1, 1, 2)
+        assertEqual(self.formatter._format_token(dt, 'hh'), '02')
+        assertEqual(self.formatter._format_token(dt, 'h'), '2')
+
+        dt = datetime(2013, 1, 1, 13)
         assertEqual(self.formatter._format_token(dt, 'hh'), '01')
         assertEqual(self.formatter._format_token(dt, 'h'), '1')
+
+        # test that 12-hour time converts to '12' at midnight
+        dt = datetime(2013, 1, 1, 0)
+        assertEqual(self.formatter._format_token(dt, 'hh'), '12')
+        assertEqual(self.formatter._format_token(dt, 'h'), '12')
 
     def test_minute(self):
 
@@ -71,10 +84,13 @@ class DateTimeFormatterFormatTokenTests(Chai):
 
     def test_sub_second(self):
 
-        dt = datetime(2013, 1, 1, 0, 0, 0, 500000)
-        assertEqual(self.formatter._format_token(dt, 'SSS'), '500')
-        assertEqual(self.formatter._format_token(dt, 'SS'), '50')
-        assertEqual(self.formatter._format_token(dt, 'S'), '5')
+        dt = datetime(2013, 1, 1, 0, 0, 0, 123456)
+        assertEqual(self.formatter._format_token(dt, 'SSSSSS'), '123456')
+        assertEqual(self.formatter._format_token(dt, 'SSSSS'), '12345')
+        assertEqual(self.formatter._format_token(dt, 'SSSS'), '1234')
+        assertEqual(self.formatter._format_token(dt, 'SSS'), '123')
+        assertEqual(self.formatter._format_token(dt, 'SS'), '12')
+        assertEqual(self.formatter._format_token(dt, 'S'), '1')
 
     def test_timestamp(self):
 
@@ -85,8 +101,12 @@ class DateTimeFormatterFormatTokenTests(Chai):
     def test_timezone(self):
 
         dt = datetime.utcnow().replace(tzinfo=dateutil_tz.gettz('US/Pacific'))
-        assertEqual(self.formatter._format_token(dt, 'ZZ'), '-07:00')
-        assertEqual(self.formatter._format_token(dt, 'Z'), '-0700')
+
+        result = self.formatter._format_token(dt, 'ZZ')
+        assertTrue(result == '-07:00' or result == '-08:00')
+
+        result = self.formatter._format_token(dt, 'Z')
+        assertTrue(result == '-0700' or result == '-0800')
 
     def test_am_pm(self):
 

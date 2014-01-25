@@ -5,6 +5,7 @@ import time
 
 from arrow import api, factory, arrow, util
 
+
 class ModuleTests(Chai):
 
     def test_get(self):
@@ -24,12 +25,6 @@ class ModuleTests(Chai):
         expect(api._factory.now).args('tz').returns('now')
 
         assertEqual(api.now('tz'), 'now')
-
-    def test_arrow(self):
-
-        expect(api._factory.arrow).args(date='date', tz='tz').returns('arrow')
-
-        assertEqual(api.arrow('date', 'tz'), 'arrow')
 
     def test_factory(self):
 

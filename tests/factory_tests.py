@@ -40,6 +40,13 @@ class GetTests(Chai):
         assertEqual(self.factory.get(timestamp), timestamp_dt)
         assertEqual(self.factory.get(str(timestamp)), timestamp_dt)
 
+    def test_one_arg_arrow(self):
+
+        arw = self.factory.utcnow()
+        result = self.factory.get(arw)
+
+        assertEqual(arw, result)
+
     def test_one_arg_datetime(self):
 
         dt = datetime.utcnow().replace(tzinfo=tz.tzutc())
@@ -52,11 +59,11 @@ class GetTests(Chai):
 
         assertDtEqual(self.factory.get(tz.gettz('US/Pacific')), expected)
 
-    def test_one_arg_tz_str(self):
+    def test_one_arg_iso_str(self):
 
-        expected = datetime.utcnow().replace(tzinfo=tz.tzutc()).astimezone(tz.gettz('US/Pacific'))
+        dt = datetime.utcnow()
 
-        assertDtEqual(self.factory.get('US/Pacific'), expected)
+        assertDtEqual(self.factory.get(dt.isoformat()), dt.replace(tzinfo=tz.tzutc()))
 
     def test_one_arg_other(self):
 
@@ -83,6 +90,18 @@ class GetTests(Chai):
     def test_two_args_str_str(self):
 
         result = self.factory.get('2013-01-01', 'YYYY-MM-DD')
+
+        assertEqual(result._datetime, datetime(2013, 1, 1, tzinfo=tz.tzutc()))
+
+    def test_two_args_str_list(self):
+
+        result = self.factory.get('2013-01-01', ['MM/DD/YYYY', 'YYYY-MM-DD'])
+
+        assertEqual(result._datetime, datetime(2013, 1, 1, tzinfo=tz.tzutc()))
+
+    def test_two_args_unicode_unicode(self):
+
+        result = self.factory.get(u'2013-01-01', u'YYYY-MM-DD')
 
         assertEqual(result._datetime, datetime(2013, 1, 1, tzinfo=tz.tzutc()))
 
@@ -121,46 +140,4 @@ class NowTests(Chai):
     def test_tz_str(self):
 
         assertDtEqual(self.factory.now('EST'), datetime.now(tz.gettz('EST')))
-
-
-class ArrowTests(Chai):
-
-    def setUp(self):
-        super(ArrowTests, self).setUp()
-
-        self.factory = factory.ArrowFactory()
-
-    def test_none_none(self):
-
-        result = self.factory.arrow()
-
-        assertDtEqual(result._datetime, datetime.utcnow().replace(tzinfo=tz.tzutc()))
-
-    def test_none_tz(self):
-
-        result = self.factory.arrow('local')
-
-        assertDtEqual(result._datetime, datetime.now(tz.tzlocal()))
-
-    def test_dt_str_none(self):
-
-        dt = datetime(2013, 1, 1)
-
-        result = self.factory.arrow(dt)
-
-        assertDtEqual(result._datetime, dt.replace(tzinfo=tz.tzutc()))
-
-    def test_datetime_tzinfo(self):
-
-        result = self.factory.arrow(datetime(2013, 1, 1), 'local')
-
-        assertEqual(result._datetime, datetime(2013, 1, 1, tzinfo=tz.tzlocal()))
-
-    def test_int(self):
-
-        timestamp = int(time.time())
-
-        result = self.factory.arrow(time.time())
-
-        assertDtEqual(result, self.factory.utcnow())
 

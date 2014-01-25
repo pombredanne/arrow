@@ -9,7 +9,7 @@ from arrow import util, locales
 
 class DateTimeFormatter(object):
 
-    _FORMAT_RE = re.compile('(YYY?Y?|MM?M?M?|DD?D?D?|d?dd?d?|HH?|hh?|mm?|ss?|SS?S?|ZZ?|a|A|X)')
+    _FORMAT_RE = re.compile('(YYY?Y?|MM?M?M?|DD?D?D?|d?dd?d?|HH?|hh?|mm?|ss?|SS?S?S?S?S?|ZZ?|a|A|X)')
 
     def __init__(self, locale='en_us'):
 
@@ -56,9 +56,9 @@ class DateTimeFormatter(object):
         if token == 'H':
             return str(dt.hour)
         if token == 'hh':
-            return '{0:02d}'.format(dt.hour if dt.hour < 13 else dt.hour - 12)
+            return '{0:02d}'.format(dt.hour if 0 < dt.hour < 13 else abs(dt.hour - 12))
         if token == 'h':
-            return str(dt.hour if dt.hour < 13 else dt.hour - 12)
+            return str(dt.hour if 0 < dt.hour < 13 else abs(dt.hour - 12))
 
         if token == 'mm':
             return '{0:02d}'.format(dt.minute)
@@ -70,6 +70,12 @@ class DateTimeFormatter(object):
         if token == 's':
             return str(dt.second)
 
+        if token == 'SSSSSS':
+            return str(dt.microsecond)
+        if token == 'SSSSS':
+            return str(int(dt.microsecond / 10))
+        if token == 'SSSS':
+            return str(int(dt.microsecond / 100))
         if token == 'SSS':
             return str(int(dt.microsecond / 1000))
         if token == 'SS':
@@ -85,7 +91,7 @@ class DateTimeFormatter(object):
             tz = dateutil_tz.tzutc() if dt.tzinfo is None else dt.tzinfo
             total_minutes = int(util.total_seconds(tz.utcoffset(dt)) / 60)
 
-            sign = '-' if total_minutes > 0 else '-'
+            sign = '+' if total_minutes > 0 else '-'
             total_minutes = abs(total_minutes)
             hour, minute = divmod(total_minutes, 60)
 

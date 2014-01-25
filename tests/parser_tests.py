@@ -93,6 +93,12 @@ class DateTimeParserParseTests(Chai):
         expected = datetime(1, 1, 1, 1, 0, 0)
         assertEqual(self.parser.parse('1 am', 'H A'), expected)
 
+        expected = datetime(1, 1, 1, 0, 0, 0)
+        assertEqual(self.parser.parse('12 am', 'H A'), expected)
+
+        expected = datetime(1, 1, 1, 12, 0, 0)
+        assertEqual(self.parser.parse('12 pm', 'H A'), expected)
+
     def test_parse_tz(self):
 
         expected = datetime(2013, 1, 1, tzinfo=tz.tzoffset(None, -7 * 3600))
@@ -108,6 +114,15 @@ class DateTimeParserParseTests(Chai):
 
         expected = datetime(2013, 1, 1, 12, 30, 45, 999000)
         assertEqual(self.parser.parse('2013-01-01 12:30:45:999', 'YYYY-MM-DD HH:mm:ss:SSS'), expected)
+
+        expected = datetime(2013, 1, 1, 12, 30, 45, 999900)
+        assertEqual(self.parser.parse('2013-01-01 12:30:45:9999', 'YYYY-MM-DD HH:mm:ss:SSSS'), expected)
+
+        expected = datetime(2013, 1, 1, 12, 30, 45, 999990)
+        assertEqual(self.parser.parse('2013-01-01 12:30:45:99999', 'YYYY-MM-DD HH:mm:ss:SSSSS'), expected)
+
+        expected = datetime(2013, 1, 1, 12, 30, 45, 999999)
+        assertEqual(self.parser.parse('2013-01-01 12:30:45:999999', 'YYYY-MM-DD HH:mm:ss:SSSSSS'), expected)
 
     def test_map_lookup_keyerror(self):
 
@@ -154,7 +169,8 @@ class DateTimeParserRegexTests(Chai):
 
     def test_format_subsecond(self):
 
-        assertEqual(self.format_regex.findall('SSS-SS-S'), ['SSS', 'SS', 'S'])
+        assertEqual(self.format_regex.findall('SSSSSS-SSSSS-SSSS-SSS-SS-S'),
+                ['SSSSSS', 'SSSSS', 'SSSS', 'SSS', 'SS', 'S'])
 
     def test_format_tz(self):
 
@@ -189,6 +205,123 @@ class DateTimeParserRegexTests(Chai):
         assertEqual(parser.DateTimeParser._TWO_DIGIT_RE.findall('12-3-45'), ['12', '45'])
         assertEqual(parser.DateTimeParser._FOUR_DIGIT_RE.findall('1234-56'), ['1234'])
         assertEqual(parser.DateTimeParser._ONE_OR_TWO_DIGIT_RE.findall('4-56'), ['4', '56'])
+
+
+class DateTimeParserISOTests(Chai):
+
+    def setUp(self):
+        super(DateTimeParserISOTests, self).setUp()
+
+        self.parser = parser.DateTimeParser('en_us')
+
+    def test_YYYY(self):
+
+        assertEqual(
+            self.parser.parse_iso('2013'),
+            datetime(2013, 1, 1)
+        )
+
+    def test_YYYY_MM(self):
+
+        assertEqual(
+            self.parser.parse_iso('2013-02'),
+            datetime(2013, 2, 1)
+        )
+
+    def test_YYYY_MM_DD(self):
+
+        assertEqual(
+            self.parser.parse_iso('2013-02-03'),
+            datetime(2013, 2, 3)
+        )
+
+    def test_YYYY_MM_DDTHH_mmZ(self):
+
+        assertEqual(
+            self.parser.parse_iso('2013-02-03T04:05+01:00'),
+            datetime(2013, 2, 3, 4, 5, tzinfo=tz.tzoffset(None, 3600))
+        )
+
+    def test_YYYY_MM_DDTHH_mm(self):
+
+        assertEqual(
+            self.parser.parse_iso('2013-02-03T04:05'),
+            datetime(2013, 2, 3, 4, 5)
+        )
+
+    def test_YYYY_MM_DDTHH_mm_ssZ(self):
+
+        assertEqual(
+            self.parser.parse_iso('2013-02-03T04:05:06+01:00'),
+            datetime(2013, 2, 3, 4, 5, 6, tzinfo=tz.tzoffset(None, 3600))
+        )
+
+    def test_YYYY_MM_DDTHH_mm_ss(self):
+
+        assertEqual(
+            self.parser.parse_iso('2013-02-03T04:05:06'),
+            datetime(2013, 2, 3, 4, 5, 6)
+        )
+
+    def test_YYYY_MM_DDTHH_mm_ss_S(self):
+
+        assertEqual(
+            self.parser.parse_iso('2013-02-03T04:05:06.7'),
+            datetime(2013, 2, 3, 4, 5, 6, 7)
+        )
+
+        assertEqual(
+            self.parser.parse_iso('2013-02-03T04:05:06.78'),
+            datetime(2013, 2, 3, 4, 5, 6, 78)
+        )
+
+        assertEqual(
+            self.parser.parse_iso('2013-02-03T04:05:06.789'),
+            datetime(2013, 2, 3, 4, 5, 6, 789)
+        )
+
+        assertEqual(
+            self.parser.parse_iso('2013-02-03T04:05:06.7891'),
+            datetime(2013, 2, 3, 4, 5, 6, 7891)
+        )
+
+        assertEqual(
+            self.parser.parse_iso('2013-02-03T04:05:06.78912'),
+            datetime(2013, 2, 3, 4, 5, 6, 78912)
+        )
+
+    def test_YYYY_MM_DDTHH_mm_ss_SZ(self):
+
+        assertEqual(
+            self.parser.parse_iso('2013-02-03T04:05:06.7+01:00'),
+            datetime(2013, 2, 3, 4, 5, 6, 7, tzinfo=tz.tzoffset(None, 3600))
+        )
+
+        assertEqual(
+            self.parser.parse_iso('2013-02-03T04:05:06.78+01:00'),
+            datetime(2013, 2, 3, 4, 5, 6, 78, tzinfo=tz.tzoffset(None, 3600))
+        )
+
+        assertEqual(
+            self.parser.parse_iso('2013-02-03T04:05:06.789+01:00'),
+            datetime(2013, 2, 3, 4, 5, 6, 789, tzinfo=tz.tzoffset(None, 3600))
+        )
+
+        assertEqual(
+            self.parser.parse_iso('2013-02-03T04:05:06.7891+01:00'),
+            datetime(2013, 2, 3, 4, 5, 6, 7891, tzinfo=tz.tzoffset(None, 3600))
+        )
+
+        assertEqual(
+            self.parser.parse_iso('2013-02-03T04:05:06.78912+01:00'),
+            datetime(2013, 2, 3, 4, 5, 6, 78912, tzinfo=tz.tzoffset(None, 3600))
+        )
+
+    def test_isoformat(self):
+
+        dt = datetime.utcnow()
+
+        assertEqual(self.parser.parse_iso(dt.isoformat()), dt)
 
 
 class TzinfoParserTests(Chai):

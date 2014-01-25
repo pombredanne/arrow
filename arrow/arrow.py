@@ -47,8 +47,10 @@ class Arrow(object):
     _ATTRS_PLURAL = ['{0}s'.format(a) for a in _ATTRS]
 
     def __init__(self, year, month, day, hour=0, minute=0, second=0, microsecond=0,
-        tzinfo=None):
+                 tzinfo=None):
 
+        if util.isstr(tzinfo):
+            tzinfo = parser.TzinfoParser.parse(tzinfo)
         tzinfo = tzinfo or dateutil_tz.tzutc()
 
         self._datetime = datetime(year, month, day, hour, minute, second,
@@ -73,7 +75,10 @@ class Arrow(object):
 
     @classmethod
     def utcnow(cls):
-        '''Constructs an :class:`Arrow <arrow.arrow.Arrow>` object, representing "now" in UTC time. '''
+        ''' Constructs an :class:`Arrow <arrow.arrow.Arrow>` object, representing "now" in UTC
+        time.
+
+        '''
 
         dt = datetime.utcnow()
 
@@ -82,14 +87,15 @@ class Arrow(object):
 
     @classmethod
     def fromtimestamp(cls, timestamp, tzinfo=None):
-        '''Constructs an :class:`Arrow <arrow.arrow.Arrow>` object from a timestamp.
+        ''' Constructs an :class:`Arrow <arrow.arrow.Arrow>` object from a timestamp.
 
-        :param timestamp: an ``int`` or ``float`` timestamp.
+        :param timestamp: an ``int`` or ``float`` timestamp, or a ``str`` that converts to either.
         :param tzinfo: (optional) a ``tzinfo`` object.  Defaults to local time.
 
         '''
 
         tzinfo = tzinfo or dateutil_tz.tzlocal()
+        timestamp = cls._get_timestamp_from_input(timestamp)
         dt = datetime.fromtimestamp(timestamp, tzinfo)
 
         return cls(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second,
@@ -99,10 +105,11 @@ class Arrow(object):
     def utcfromtimestamp(cls, timestamp):
         '''Constructs an :class:`Arrow <arrow.arrow.Arrow>` object from a timestamp, in UTC time.
 
-        :param timestamp: an integer or floating-point timestamp.
+        :param timestamp: an ``int`` or ``float`` timestamp, or a ``str`` that converts to either.
 
         '''
 
+        timestamp = cls._get_timestamp_from_input(timestamp)
         dt = datetime.utcfromtimestamp(timestamp)
 
         return cls(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second,
@@ -167,14 +174,13 @@ class Arrow(object):
         :param limit: (optional) A maximum number of tuples to return.
 
         **NOTE**: the **end** or **limit** must be provided.  Call with **end** alone to
-        return the entire range, with **limit** alone to return a maximum # of results from the start,
-        and with both to cap a range at a maximum # of results.
+        return the entire range, with **limit** alone to return a maximum # of results from the
+        start, and with both to cap a range at a maximum # of results.
 
         Recognized datetime expressions:
 
             - An :class:`Arrow <arrow.arrow.Arrow>` object.
             - A ``datetime`` object.
-            - A timestamp, as an ``int``, ``float``, or ``str`` that converts to one.
 
         Recognized timezone expressions:
 
@@ -198,9 +204,9 @@ class Arrow(object):
 
         '''
 
-        frame_absolute, frame_relative = cls._get_frames(frame)
+        frame_relative = cls._get_frames(frame)[1]
+        tzinfo = cls._get_tzinfo(start.tzinfo if tz is None else tz)
 
-        tzinfo = cls._get_tzinfo(tz)
         start = cls._get_datetime(start).replace(tzinfo=tzinfo)
         end, limit = cls._get_iteration_params(end, limit)
         end = cls._get_datetime(end).replace(tzinfo=tzinfo)
@@ -219,8 +225,8 @@ class Arrow(object):
 
     @classmethod
     def span_range(cls, frame, start, end, tz=None, limit=None):
-        ''' Returns an array of tuples, each :class:`Arrow <arrow.arrow.Arrow>` objects, representing
-        a series of timespans between two inputs.
+        ''' Returns an array of tuples, each :class:`Arrow <arrow.arrow.Arrow>` objects,
+        representing a series of timespans between two inputs.
 
         :param frame: the timeframe.  Can be any ``datetime`` property (day, hour, minute...).
         :param start: A datetime expression, the start of the range.
@@ -229,14 +235,13 @@ class Arrow(object):
         :param limit: (optional) A maximum number of tuples to return.
 
         **NOTE**: the **end** or **limit** must be provided.  Call with **end** alone to
-        return the entire range, with **limit** alone to return a maximum # of results from the start,
-        and with both to cap a range at a maximum # of results.
+        return the entire range, with **limit** alone to return a maximum # of results from the
+        start, and with both to cap a range at a maximum # of results.
 
         Recognized datetime expressions:
 
             - An :class:`Arrow <arrow.arrow.Arrow>` object.
             - A ``datetime`` object.
-            - A timestamp, as an ``int``, ``float``, or ``str`` that converts to one.
 
         Recognized timezone expressions:
 
@@ -260,35 +265,9 @@ class Arrow(object):
 
         '''
 
-        frame_absolute, frame_relative = cls._get_frames(frame)
+        _range = cls.range(frame, start, end, tz, limit)
+        return [r.span(frame) for r in _range]
 
-        tzinfo = cls._get_tzinfo(tz)
-        start = cls._get_datetime(start).replace(tzinfo=tzinfo)
-        end, limit = cls._get_iteration_params(end, limit)
-        end = cls._get_datetime(end).replace(tzinfo=tzinfo)
-
-        index = cls._ATTRS.index(frame_absolute)
-        frames = cls._ATTRS[:index + 1]
-
-        results = []
-        current = start
-
-        while current <= end and len(results) < limit:
-            values = [getattr(current, f) for f in frames]
-
-            for i in range(3 - len(values)):
-                values.append(1)
-
-            floor = datetime(*values, tzinfo=tzinfo)
-
-            ceil = floor + relativedelta(**{frame_relative: 1})
-            ceil = ceil + relativedelta(microseconds=-1)
-
-            results.append((cls.fromdatetime(floor), cls.fromdatetime(ceil)))
-
-            current += relativedelta(**{frame_relative: 1})
-
-        return results
 
     # representations
 
@@ -318,10 +297,14 @@ class Arrow(object):
 
     def __getattr__(self, name):
 
-        value = getattr(self._datetime, name, None)
+        if name == 'week':
+            return self.isocalendar()[1]
 
-        if value is not None:
-            return value
+        if not name.startswith('_'):
+            value = getattr(self._datetime, name, None)
+
+            if value is not None:
+                return value
 
         return object.__getattribute__(self, name)
 
@@ -355,6 +338,12 @@ class Arrow(object):
 
         return calendar.timegm(self._datetime.utctimetuple())
 
+    @property
+    def float_timestamp(self):
+        ''' Returns a floating-point representation of the :class:`Arrow <arrow.arrow.Arrow>` object. '''
+
+        return self.timestamp + float(self.microsecond) / 1000000
+
 
     # mutation and duplication.
 
@@ -371,7 +360,8 @@ class Arrow(object):
         return self.fromdatetime(self._datetime)
 
     def replace(self, **kwargs):
-        ''' Returns a new :class:`Arrow <arrow.arrow.Arrow>` object with attributes updated according to inputs.
+        ''' Returns a new :class:`Arrow <arrow.arrow.Arrow>` object with attributes updated
+        according to inputs.
 
         Use single property names to set their value absolutely:
 
@@ -408,8 +398,10 @@ class Arrow(object):
 
             if key in self._ATTRS:
                 absolute_kwargs[key] = value
-            elif key in self._ATTRS_PLURAL:
+            elif key in self._ATTRS_PLURAL or key == 'weeks':
                 relative_kwargs[key] = value
+            elif key == 'week':
+                raise AttributeError('setting absolute week is not supported')
             elif key !='tzinfo':
                 raise AttributeError()
 
@@ -487,14 +479,30 @@ class Arrow(object):
 
         '''
 
-        return self.span_range(frame, self._datetime, self._datetime,
-            self._datetime.tzinfo)[0]
+        frame_absolute, frame_relative = self._get_frames(frame)
 
+        index = self._ATTRS.index('day' if frame_absolute == 'week' else frame_absolute)
+        frames = self._ATTRS[:index + 1]
+
+        values = [getattr(self, f) for f in frames]
+
+        for i in range(3 - len(values)):
+            values.append(1)
+
+        floor = self.__class__(*values, tzinfo=self.tzinfo)
+
+        if frame_absolute == 'week':
+            floor = floor + relativedelta(days=-(self.isoweekday() - 1))
+
+        ceil = floor + relativedelta(**{frame_relative: 1}) + relativedelta(microseconds=-1)
+
+        return floor, ceil
 
     def floor(self, frame):
         ''' Returns a new :class:`Arrow <arrow.arrow.Arrow>` object, representing the "floor"
         of the timespan of the :class:`Arrow <arrow.arrow.Arrow>` object in a given timeframe.
-        Equivalent to the first element in the 2-tuple returned by :func:`span <arrow.arrow.Arrow.span>`.
+        Equivalent to the first element in the 2-tuple returned by
+        :func:`span <arrow.arrow.Arrow.span>`.
 
         :param frame: the timeframe.  Can be any ``datetime`` property (day, hour, minute...).
 
@@ -509,7 +517,8 @@ class Arrow(object):
     def ceil(self, frame):
         ''' Returns a new :class:`Arrow <arrow.arrow.Arrow>` object, representing the "ceiling"
         of the timespan of the :class:`Arrow <arrow.arrow.Arrow>` object in a given timeframe.
-        Equivalent to the second element in the 2-tuple returned by :func:`span <arrow.arrow.Arrow.span>`.
+        Equivalent to the second element in the 2-tuple returned by
+        :func:`span <arrow.arrow.Arrow.span>`.
 
         :param frame: the timeframe.  Can be any ``datetime`` property (day, hour, minute...).
 
@@ -820,6 +829,9 @@ class Arrow(object):
         if name in cls._ATTRS:
             return name, '{0}s'.format(name)
 
+        elif name in ['week', 'weeks']:
+            return 'week', 'weeks'
+
         raise AttributeError()
 
     @classmethod
@@ -834,6 +846,14 @@ class Arrow(object):
 
         else:
             return end, sys.maxsize
+
+    @classmethod
+    def _get_timestamp_from_input(cls, timestamp):
+
+        try:
+            return float(timestamp)
+        except:
+            raise ValueError('cannot parse \'{0}\' as a timestamp'.format(timestamp))
 
 Arrow.min = Arrow.fromdatetime(datetime.min)
 Arrow.max = Arrow.fromdatetime(datetime.max)
