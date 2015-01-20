@@ -1,5 +1,27 @@
 ## History
 
+### 0.4.3
+
+- [NEW] Turkish locale (Emre)
+- [NEW] Arabic locale (Mosab Ahmad)
+- [NEW] Danish locale (Holmars)
+- [NEW] Icelandic locale (Holmars)
+- [NEW] Hindi locale (Atmb4u)
+- [NEW] Malayalam locale (Atmb4u)
+- [NEW] Finnish locale (Stormpat)
+- [NEW] Portuguese locale (Danielcorreia)
+- [NEW] ``h`` and ``hh`` strings are now supported (Averyonghub)
+- [FIX] An incorrect inflection in the Polish locale has been fixed (Avalanchy)
+- [FIX] ``arrow.get`` now properly handles ``Date``s (Jaapz)
+- [FIX] Tests are now declared in ``setup.py`` and the manifest (Pypingou)
+- [FIX] ``__version__`` has been added to ``__init__.py`` (Sametmax)
+- [FIX] ISO 8601 strings can be parsed without a separator (Ivandiguisto / Root)
+- [FIX] Documentation is now more clear regarding some inputs on ``arrow.get`` (Eriktaubeneck)
+- [FIX] Some documentation links have been fixed (Vrutsky)
+- [FIX] Error messages for parse errors are now more descriptive (Maciej Albin)
+- [FIX] The parser now correctly checks for separators in strings (Mschwager)
+
+
 ### 0.4.2
 
 - [NEW] Factory ``get`` method now accepts a single ``Arrow`` argument.
@@ -36,7 +58,7 @@
 - [FIX] Timezones no longer show the wrong sign when formatted (Bean)
 - [FIX] Microseconds are parsed correctly from strings (Bsidhom)
 - [FIX] Locale day-of-week is no longer off by one (Cynddl)
-- [FIX] Corrected plurals of Ukranian and Russina nouns (Catchagain)
+- [FIX] Corrected plurals of Ukrainian and Russian nouns (Catchagain)
 - [CHANGE] Old 0.1 ``arrow`` module method removed
 - [CHANGE] Dropped timestamp support in ``range`` and ``span_range`` (never worked correctly) 
 - [CHANGE] Dropped parsing of single string as tz string in factory ``get`` method (replaced by ISO-8601) 
@@ -72,7 +94,7 @@
 
 - [NEW] ``Arrow.replace`` method
 - [NEW] Accept timestamps, datetimes and Arrows for datetime inputs, where reasonable
-- [FIX] ``range`` and ``span_range`` respect end and limit paremters correctly
+- [FIX] ``range`` and ``span_range`` respect end and limit parameters correctly
 - [CHANGE] Arrow objects are no longer mutable
 - [CHANGE] Plural attribute name semantics altered: single -> absolute, plural -> relative
 - [CHANGE] Plural names no longer supported as properties (e.g. ``arrow.utcnow().years``)

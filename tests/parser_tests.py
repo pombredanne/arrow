@@ -62,6 +62,11 @@ class DateTimeParserParseTests(Chai):
         with assertRaises(parser.ParserError):
             self.parser.parse('01-01', 'YYYY-MM-DD')
 
+    def test_parse_separators(self):
+
+        with assertRaises(parser.ParserError):
+            self.parser.parse('1403549231', 'YYYY-MM-DD')
+
     def test_parse_numbers(self):
 
         expected = datetime(2012, 1, 1, 12, 5, 10)
@@ -74,8 +79,9 @@ class DateTimeParserParseTests(Chai):
 
     def test_parse_timestamp(self):
 
+        tz_utc = tz.tzutc()
         timestamp = int(time.time())
-        expected = datetime.fromtimestamp(timestamp)
+        expected = datetime.fromtimestamp(timestamp, tz=tz_utc)
         assertEqual(self.parser.parse(str(timestamp), 'X'), expected)
 
     def test_parse_names(self):
@@ -260,6 +266,34 @@ class DateTimeParserISOTests(Chai):
 
         assertEqual(
             self.parser.parse_iso('2013-02-03T04:05:06'),
+            datetime(2013, 2, 3, 4, 5, 6)
+        )
+
+    def test_YYYY_MM_DD_HH_mmZ(self):
+
+        assertEqual(
+            self.parser.parse_iso('2013-02-03 04:05+01:00'),
+            datetime(2013, 2, 3, 4, 5, tzinfo=tz.tzoffset(None, 3600))
+        )
+
+    def test_YYYY_MM_DD_HH_mm(self):
+
+        assertEqual(
+            self.parser.parse_iso('2013-02-03 04:05'),
+            datetime(2013, 2, 3, 4, 5)
+        )
+
+    def test_YYYY_MM_DD_HH_mm_ssZ(self):
+
+        assertEqual(
+            self.parser.parse_iso('2013-02-03 04:05:06+01:00'),
+            datetime(2013, 2, 3, 4, 5, 6, tzinfo=tz.tzoffset(None, 3600))
+        )
+
+    def test_YYYY_MM_DD_HH_mm_ss(self):
+
+        assertEqual(
+            self.parser.parse_iso('2013-02-03 04:05:06'),
             datetime(2013, 2, 3, 4, 5, 6)
         )
 
