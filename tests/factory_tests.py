@@ -1,6 +1,7 @@
 from chai import Chai
 from datetime import datetime, date
 from dateutil import tz
+import time
 
 from arrow import factory, util
 
@@ -32,6 +33,11 @@ class GetTests(Chai):
 
         assertDtEqual(self.factory.get(None), datetime.utcnow().replace(tzinfo=tz.tzutc()))
 
+    def test_struct_time(self):
+
+        assertDtEqual(self.factory.get(time.gmtime()),
+            datetime.utcnow().replace(tzinfo=tz.tzutc()))
+
     def test_one_arg_timestamp(self):
 
         timestamp = 12345
@@ -45,6 +51,12 @@ class GetTests(Chai):
 
         assertEqual(self.factory.get(timestamp), timestamp_dt)
         assertEqual(self.factory.get(str(timestamp)), timestamp_dt)
+
+        # Issue 216
+        timestamp = '99999999999999999999999999'
+        # Python 3 raises `OverflowError`, Python 2 raises `ValueError`
+        with assertRaises((OverflowError, ValueError,)):
+            self.factory.get(timestamp)
 
     def test_one_arg_arrow(self):
 
@@ -139,6 +151,14 @@ class GetTests(Chai):
 
         with assertRaises(TypeError):
             self.factory.get(object(), object())
+
+    def test_three_args_with_tzinfo(self):
+
+        timefmt = 'YYYYMMDD'
+        d = '20150514'
+
+        assertEqual(self.factory.get(d, timefmt, tzinfo=tz.tzlocal()),
+                    datetime(2015, 5, 14, tzinfo=tz.tzlocal()))
 
     def test_three_args(self):
 

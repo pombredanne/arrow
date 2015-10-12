@@ -66,6 +66,9 @@ Quickstart
     >>> local.timestamp
     1368303838
 
+    >>> local.format()
+    '2013-05-11 13:23:58 -07:00'
+
     >>> local.format('YYYY-MM-DD HH:mm:ss ZZ')
     '2013-05-11 13:23:58 -07:00'
 
@@ -134,6 +137,13 @@ Parse from a string:
 
     >>> arrow.get('2013-05-05 12:30:45', 'YYYY-MM-DD HH:mm:ss')
     <Arrow [2013-05-05T12:30:45+00:00]>
+
+Search a date in a string:
+
+.. code-block:: python
+
+    >>> arrow.get('June was born in May 1980', 'MMMM YYYY')
+    <Arrow [1980-05-01T00:00:00+00:00]>
 
 Many ISO-8601 compliant strings are recognized and parsed without a format string:
 
@@ -365,7 +375,7 @@ Then get and use a factory for it:
 Tokens
 ======
 
-Use the following tokens in parsing and formatting:
+Use the following tokens in parsing and formatting.  Note that they're not the same as the tokens for `strptime(3) <https://www.gnu.org/software/libc/manual/html_node/Low_002dLevel-Time-String-Parsing.html#index-strptime>`_:
 
 +--------------------------------+--------------+-------------------------------------------+
 |                                |Token         |Output                                     |
@@ -374,9 +384,9 @@ Use the following tokens in parsing and formatting:
 +--------------------------------+--------------+-------------------------------------------+
 |                                |YY            |00, 01, 02 ... 12, 13                      |
 +--------------------------------+--------------+-------------------------------------------+
-|**Month**                       |MMMM          |January, February, March ...               |
+|**Month**                       |MMMM          |January, February, March ... [#t1]_        |
 +--------------------------------+--------------+-------------------------------------------+
-|                                |MMM           |Jan, Feb, Mar ...                          |
+|                                |MMM           |Jan, Feb, Mar ... [#t1]_                   |
 +--------------------------------+--------------+-------------------------------------------+
 |                                |MM            |01, 02, 03 ... 11, 12                      |
 +--------------------------------+--------------+-------------------------------------------+
@@ -390,9 +400,11 @@ Use the following tokens in parsing and formatting:
 +--------------------------------+--------------+-------------------------------------------+
 |                                |D             |1, 2, 3 ... 30, 31                         |
 +--------------------------------+--------------+-------------------------------------------+
-|**Day of Week**                 |dddd          |Monday, Tuesday, Wednesday ...             |
+|                                |Do            |1st, 2nd, 3rd ... 30th, 31st               |
 +--------------------------------+--------------+-------------------------------------------+
-|                                |ddd           |Mon, Tue, Wed ...                          |
+|**Day of Week**                 |dddd          |Monday, Tuesday, Wednesday ... [#t2]_      |
++--------------------------------+--------------+-------------------------------------------+
+|                                |ddd           |Mon, Tue, Wed ... [#t2]_                   |
 +--------------------------------+--------------+-------------------------------------------+
 |                                |d             |1, 2, 3 ... 6, 7                           |
 +--------------------------------+--------------+-------------------------------------------+
@@ -404,9 +416,9 @@ Use the following tokens in parsing and formatting:
 +--------------------------------+--------------+-------------------------------------------+
 |                                |h             |1, 2, 3 ... 11, 12                         |
 +--------------------------------+--------------+-------------------------------------------+
-|**AM / PM**                     |A             |AM, PM                                     |
+|**AM / PM**                     |A             |AM, PM, am, pm [#t1]_                      |
 +--------------------------------+--------------+-------------------------------------------+
-|                                |a             |am, pm                                     |
+|                                |a             |am, pm [#t1]_                              |
 +--------------------------------+--------------+-------------------------------------------+
 |**Minute**                      |mm            |00, 01, 02 ... 58, 59                      |
 +--------------------------------+--------------+-------------------------------------------+
@@ -429,6 +441,10 @@ Use the following tokens in parsing and formatting:
 |**Timestamp**                   |X             |1381685817                                 |
 +--------------------------------+--------------+-------------------------------------------+
 
+.. rubric:: Footnotes
+
+.. [#t1] localization support for parsing and formatting
+.. [#t2] localization support only for formatting
 
 ---------
 API Guide
