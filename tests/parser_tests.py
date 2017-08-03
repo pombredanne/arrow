@@ -22,7 +22,7 @@ class DateTimeParserTests(Chai):
 
         mock_datetime = mock()
 
-        expect(self.parser.parse).args('str', 'fmt_a').raises(Exception)
+        expect(self.parser.parse).args('str', 'fmt_a').raises(ParserError)
         expect(self.parser.parse).args('str', 'fmt_b').returns(mock_datetime)
 
         result = self.parser._parse_multiformat('str', ['fmt_a', 'fmt_b'])
@@ -31,11 +31,72 @@ class DateTimeParserTests(Chai):
 
     def test_parse_multiformat_all_fail(self):
 
-        expect(self.parser.parse).args('str', 'fmt_a').raises(Exception)
-        expect(self.parser.parse).args('str', 'fmt_b').raises(Exception)
+        expect(self.parser.parse).args('str', 'fmt_a').raises(ParserError)
+        expect(self.parser.parse).args('str', 'fmt_b').raises(ParserError)
 
-        with assertRaises(Exception):
+        with assertRaises(ParserError):
             self.parser._parse_multiformat('str', ['fmt_a', 'fmt_b'])
+
+    def test_parse_multiformat_unexpected_fail(self):
+
+        class UnexpectedError(Exception):
+            pass
+
+        expect(self.parser.parse).args('str', 'fmt_a').raises(UnexpectedError)
+
+        with assertRaises(UnexpectedError):
+            self.parser._parse_multiformat('str', ['fmt_a', 'fmt_b'])
+
+    def test_parse_token_nonsense(self):
+        parts = {}
+        self.parser._parse_token('NONSENSE', '1900', parts)
+        assertEqual(parts, {})
+
+    def test_parse_token_invalid_meridians(self):
+        parts = {}
+        self.parser._parse_token('A', 'a..m', parts)
+        assertEqual(parts, {})
+        self.parser._parse_token('a', 'p..m', parts)
+        assertEqual(parts, {})
+
+    def test_parser_no_caching(self):
+
+        expect(parser.DateTimeParser, '_generate_pattern_re').args('fmt_a').times(100)
+        self.parser = parser.DateTimeParser(cache_size=0)
+        for _ in range(100):
+            self.parser._generate_pattern_re('fmt_a')
+
+    def test_parser_1_line_caching(self):
+
+        expect(parser.DateTimeParser, '_generate_pattern_re').args('fmt_a').times(1)
+        self.parser = parser.DateTimeParser(cache_size=1)
+        for _ in range(100):
+            self.parser._generate_pattern_re('fmt_a')
+
+        expect(parser.DateTimeParser, '_generate_pattern_re').args('fmt_b').times(1)
+        for _ in range(100):
+            self.parser._generate_pattern_re('fmt_a')
+        self.parser._generate_pattern_re('fmt_b')
+
+        expect(parser.DateTimeParser, '_generate_pattern_re').args('fmt_a').times(1)
+        for _ in range(100):
+            self.parser._generate_pattern_re('fmt_a')
+
+    def test_parser_multiple_line_caching(self):
+
+        expect(parser.DateTimeParser, '_generate_pattern_re').args('fmt_a').times(1)
+        self.parser = parser.DateTimeParser(cache_size=2)
+        for _ in range(100):
+            self.parser._generate_pattern_re('fmt_a')
+
+        expect(parser.DateTimeParser, '_generate_pattern_re').args('fmt_b').times(1)
+        for _ in range(100):
+            self.parser._generate_pattern_re('fmt_a')
+        self.parser._generate_pattern_re('fmt_b')
+
+        expect(parser.DateTimeParser, '_generate_pattern_re').args('fmt_a').times(0)
+        for _ in range(100):
+            self.parser._generate_pattern_re('fmt_a')
 
 
 class DateTimeParserParseTests(Chai):
@@ -114,10 +175,40 @@ class DateTimeParserParseTests(Chai):
         assertEqual(self.parser.parse('12 pm', 'H A'), expected)
         assertEqual(self.parser.parse('12 pm', 'h A'), expected)
 
-    def test_parse_tz(self):
+    def test_parse_tz_hours_only(self):
+        expected = datetime(2025, 10, 17, 5, 30, 10, tzinfo=tz.tzoffset(None, 0))
+        parsed = self.parser.parse('2025-10-17 05:30:10+00', 'YYYY-MM-DD HH:mm:ssZ')
+        assertEqual(parsed, expected)
+
+    def test_parse_tz_zz(self):
 
         expected = datetime(2013, 1, 1, tzinfo=tz.tzoffset(None, -7 * 3600))
         assertEqual(self.parser.parse('2013-01-01 -07:00', 'YYYY-MM-DD ZZ'), expected)
+
+    def test_parse_tz_name_zzz(self):
+        for tz_name in (
+            # best solution would be to test on every available tz name from
+            # the tz database but it is actualy tricky to retrieve them from
+            # dateutil so here is short list that should match all
+            # naming patterns/conventions in used tz databaze
+            'Africa/Tripoli',
+            'America/Port_of_Spain',
+            'Australia/LHI',
+            'Etc/GMT-11',
+            'Etc/GMT0',
+            'Etc/UCT',
+            'Etc/GMT+9',
+            'GMT+0',
+            'CST6CDT',
+            'GMT-0',
+            'W-SU',
+        ):
+            expected = datetime(2013, 1, 1, tzinfo=tz.gettz(tz_name))
+            assertEqual(self.parser.parse('2013-01-01 %s' % tz_name, 'YYYY-MM-DD ZZZ'), expected)
+
+        # note that offsets are not timezones
+        with assertRaises(ParserError):
+            self.parser.parse('2013-01-01 +1000', 'YYYY-MM-DD ZZZ')
 
     def test_parse_subsecond(self):
 
@@ -145,17 +236,30 @@ class DateTimeParserParseTests(Chai):
         assertEqual(self.parser.parse('2013-01-01 12:30:45.987654', 'YYYY-MM-DD HH:mm:ss.SSSSSS'), expected)
         assertEqual(self.parser.parse_iso('2013-01-01 12:30:45.987654'), expected)
 
+    def test_parse_subsecond_rounding(self):
         expected = datetime(2013, 1, 1, 12, 30, 45, 987654)
-        assertEqual(self.parser.parse('2013-01-01 12:30:45.9876543', 'YYYY-MM-DD HH:mm:ss.SSSSSS'), expected)
-        assertEqual(self.parser.parse_iso('2013-01-01 12:30:45.9876543'), expected)
+        format = 'YYYY-MM-DD HH:mm:ss.S'
 
-        expected = datetime(2013, 1, 1, 12, 30, 45, 987654)
-        assertEqual(self.parser.parse('2013-01-01 12:30:45.98765432', 'YYYY-MM-DD HH:mm:ss.SSSSSS'), expected)
-        assertEqual(self.parser.parse_iso('2013-01-01 12:30:45.98765432'), expected)
+        # round up
+        string = '2013-01-01 12:30:45.9876539'
+        assertEqual(self.parser.parse(string, format), expected)
+        assertEqual(self.parser.parse_iso(string), expected)
 
-        expected = datetime(2013, 1, 1, 12, 30, 45, 987654)
-        assertEqual(self.parser.parse('2013-01-01 12:30:45.987654321', 'YYYY-MM-DD HH:mm:ss.SSSSSS'), expected)
-        assertEqual(self.parser.parse_iso('2013-01-01 12:30:45.987654321'), expected)
+        # round down
+        string = '2013-01-01 12:30:45.98765432'
+        assertEqual(self.parser.parse(string, format), expected)
+        #import pudb; pudb.set_trace()
+        assertEqual(self.parser.parse_iso(string), expected)
+
+        # round half-up
+        string = '2013-01-01 12:30:45.987653521'
+        assertEqual(self.parser.parse(string, format), expected)
+        assertEqual(self.parser.parse_iso(string), expected)
+
+        # round half-down
+        string = '2013-01-01 12:30:45.9876545210'
+        assertEqual(self.parser.parse(string, format), expected)
+        assertEqual(self.parser.parse_iso(string), expected)
 
     def test_map_lookup_keyerror(self):
 
@@ -355,6 +459,21 @@ class DateTimeParserISOTests(Chai):
             datetime(2013, 2, 3, 4, 5, 6, 789120)
         )
 
+        # ISO 8601:2004(E), ISO, 2004-12-01, 4.2.2.4 ... the decimal fraction
+        # shall be divided from the integer part by the decimal sign specified
+        # in ISO 31-0, i.e. the comma [,] or full stop [.]. Of these, the comma
+        # is the preferred sign.
+        assertEqual(
+            self.parser.parse_iso('2013-02-03T04:05:06,789123678'),
+            datetime(2013, 2, 3, 4, 5, 6, 789124)
+        )
+
+        # there is no limit on the number of decimal places
+        assertEqual(
+            self.parser.parse_iso('2013-02-03T04:05:06.789123678'),
+            datetime(2013, 2, 3, 4, 5, 6, 789124)
+        )
+
     def test_YYYY_MM_DDTHH_mm_ss_SZ(self):
 
         assertEqual(
@@ -386,6 +505,28 @@ class DateTimeParserISOTests(Chai):
         assertEqual(
             self.parser.parse_iso('2013-02-03T04:05:06.78912Z'),
             datetime(2013, 2, 3, 4, 5, 6, 789120)
+        )
+
+    def test_gnu_date(self):
+        """
+        regression tests for parsing output from GNU date(1)
+        """
+        # date -Ins
+        assertEqual(
+            self.parser.parse_iso('2016-11-16T09:46:30,895636557-0800'),
+            datetime(
+                2016, 11, 16, 9, 46, 30, 895636,
+                tzinfo=tz.tzoffset(None, -3600 * 8),
+            )
+        )
+
+        # date --rfc-3339=ns
+        assertEqual(
+            self.parser.parse_iso('2016-11-16 09:51:14.682141526-08:00'),
+            datetime(
+                2016, 11, 16, 9, 51, 14, 682142,
+                tzinfo=tz.tzoffset(None, -3600 * 8),
+            )
         )
 
     def test_isoformat(self):
@@ -603,13 +744,13 @@ class DateTimeParserMonthOrdinalDayTests(Chai):
     def test_italian(self):
         parser_ = parser.DateTimeParser('it_it')
 
-        assertEqual(parser_.parse('Gennaio 1°, 2013', 'MMMM Do, YYYY'),
+        assertEqual(parser_.parse('Gennaio 1º, 2013', 'MMMM Do, YYYY'),
                     datetime(2013, 1, 1))
 
     def test_spanish(self):
         parser_ = parser.DateTimeParser('es_es')
 
-        assertEqual(parser_.parse('Enero 1°, 2013', 'MMMM Do, YYYY'),
+        assertEqual(parser_.parse('Enero 1º, 2013', 'MMMM Do, YYYY'),
                     datetime(2013, 1, 1))
 
     def test_french(self):
@@ -637,7 +778,7 @@ class DateTimeParserSearchDateTests(Chai):
             self.parser.parse('Today is 25 of September of 2003', 'DD of MMMM of YYYY'),
             datetime(2003, 9, 25))
 
-    def test_parse_seach_with_numbers(self):
+    def test_parse_search_with_numbers(self):
 
         assertEqual(
             self.parser.parse('2000 people met the 2012-01-01 12:05:10', 'YYYY-MM-DD HH:mm:ss'),
@@ -647,13 +788,13 @@ class DateTimeParserSearchDateTests(Chai):
             self.parser.parse('Call 01-02-03 on 79-01-01 12:05:10', 'YY-MM-DD HH:mm:ss'),
             datetime(1979, 1, 1, 12, 5, 10))
 
-    def test_parse_seach_with_names(self):
+    def test_parse_search_with_names(self):
 
         assertEqual(
             self.parser.parse('June was born in May 1980', 'MMMM YYYY'),
             datetime(1980, 5, 1))
 
-    def test_parse_seach_locale_with_names(self):
+    def test_parse_search_locale_with_names(self):
         p = parser.DateTimeParser('sv_se')
 
         assertEqual(
@@ -664,7 +805,34 @@ class DateTimeParserSearchDateTests(Chai):
             p.parse('Jag föddes den 25 Augusti 1975', 'DD MMMM YYYY'),
             datetime(1975, 8, 25))
 
-    def test_parse_seach_fails(self):
+    def test_parse_search_fails(self):
 
         with assertRaises(parser.ParserError):
             self.parser.parse('Jag föddes den 25 Augusti 1975', 'DD MMMM YYYY')
+
+    def test_escape(self):
+
+        format = "MMMM D, YYYY [at] h:mma"
+        assertEqual(
+            self.parser.parse("Thursday, December 10, 2015 at 5:09pm", format),
+            datetime(2015, 12, 10, 17, 9))
+
+        format = "[MMMM] M D, YYYY [at] h:mma"
+        assertEqual(
+            self.parser.parse("MMMM 12 10, 2015 at 5:09pm", format),
+            datetime(2015, 12, 10, 17, 9))
+
+        format = "[It happened on] MMMM Do [in the year] YYYY [a long time ago]"
+        assertEqual(
+            self.parser.parse("It happened on November 25th in the year 1990 a long time ago", format),
+            datetime(1990, 11, 25))
+
+        format = "[It happened on] MMMM Do [in the][ year] YYYY [a long time ago]"
+        assertEqual(
+            self.parser.parse("It happened on November 25th in the year 1990 a long time ago", format),
+            datetime(1990, 11, 25))
+
+        format = "[I'm][ entirely][ escaped,][ weee!]"
+        assertEqual(
+            self.parser.parse("I'm entirely escaped, weee!", format),
+            datetime(1, 1, 1))

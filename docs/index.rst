@@ -13,12 +13,12 @@ Arrow is heavily inspired by `moment.js <https://github.com/timrwood/moment>`_ a
 ----
 Why?
 ----
-Python's standard library and some other low-level modules have near-complete date, time and time zone functionality but don't work very well from a usability perspective:
+Python's standard library and some other low-level modules have near-complete date, time and timezone functionality but don't work very well from a usability perspective:
 
 - Too many modules:  datetime, time, calendar, dateutil, pytz and more
 - Too many types:  date, time, datetime, tzinfo, timedelta, relativedelta, etc.
-- Time zones and timestamp conversions are verbose and unpleasant
-- Time zone naivety is the norm
+- Timezones and timestamp conversions are verbose and unpleasant
+- Timezone naivety is the norm
 - Gaps in functionality:  ISO-8601 parsing, time spans, humanization
 
 --------
@@ -26,11 +26,12 @@ Features
 --------
 
 - Fully implemented, drop-in replacement for datetime
-- Supports Python 2.6, 2.7 and 3.3
-- Time zone-aware & UTC by default
+- Supports Python 2.6, 2.7, 3.3, 3.4 and 3.5
+- Timezone-aware & UTC by default
 - Provides super-simple creation options for many common input scenarios
 - Updated .replace method with support for relative offsets, including weeks
-- Formats and parses strings, including ISO-8601-formatted strings automatically
+- Formats and parses strings automatically
+- Partial ISO-8601 support
 - Timezone conversion
 - Timestamp available as a property
 - Generates time spans, ranges, floors and ceilings in time frames from year to microsecond
@@ -52,7 +53,7 @@ Quickstart
     >>> utc
     <Arrow [2013-05-11T21:23:58.970460+00:00]>
 
-    >>> utc = utc.replace(hours=-1)
+    >>> utc = utc.shift(hours=-1)
     >>> utc
     <Arrow [2013-05-11T20:23:58.970460+00:00]>
 
@@ -114,19 +115,19 @@ Create from timestamps (ints or floats, or strings that convert to a float):
     >>> arrow.get('1367900664.152325')
     <Arrow [2013-05-07T04:24:24.152325+00:00]>
 
-Use a naive or timezone-aware datetime, or flexibly specify a time zone:
+Use a naive or timezone-aware datetime, or flexibly specify a timezone:
 
 .. code-block:: python
 
     >>> arrow.get(datetime.utcnow())
     <Arrow [2013-05-07T04:24:24.152325+00:00]>
 
-    >>> arrow.get(datetime.now(), 'US/Pacific')
-    <Arrow [2013-05-06T21:24:32.736373-07:00]>
+    >>> arrow.get(datetime(2013, 5, 5), 'US/Pacific')
+    <Arrow [2013-05-05T00:00:00-07:00]>
 
     >>> from dateutil import tz
-    >>> arrow.get(datetime.now(), tz.gettz('US/Pacific'))
-    <Arrow [2013-05-06T21:24:41.129262-07:00]>
+    >>> arrow.get(datetime(2013, 5, 5), tz.gettz('US/Pacific'))
+    <Arrow [2013-05-05T00:00:00-07:00]>
 
     >>> arrow.get(datetime.now(tz.gettz('US/Pacific')))
     <Arrow [2013-05-06T21:24:49.552236-07:00]>
@@ -145,7 +146,7 @@ Search a date in a string:
     >>> arrow.get('June was born in May 1980', 'MMMM YYYY')
     <Arrow [1980-05-01T00:00:00+00:00]>
 
-Many ISO-8601 compliant strings are recognized and parsed without a format string:
+Some ISO-8601 compliant strings are recognized and parsed without a format string:
 
     >>> arrow.get('2013-09-30T15:34:00.000-07:00')
     <Arrow [2013-09-30T15:34:00-07:00]>
@@ -204,7 +205,7 @@ Call datetime functions that return properties:
 Replace & shift
 ===============
 
-Get a new :class:`Arrow <arrow.Arrow>` object, with altered attributes, just as you would with a datetime:
+Get a new :class:`Arrow <arrow.arrow.Arrow>` object, with altered attributes, just as you would with a datetime:
 
 .. code-block:: python
 
@@ -219,8 +220,15 @@ Or, get one with attributes shifted forward or backward:
 
 .. code-block:: python
 
-    >>> arw.replace(weeks=+3)
+    >>> arw.shift(weeks=+3)
     <Arrow [2013-06-02T03:29:35.334214+00:00]>
+
+Even replace the timezone without altering other attributes:
+
+.. code-block:: python
+
+    >>> arw.replace(tzinfo='US/Pacific')
+    <Arrow [2013-05-12T03:29:35.334214-07:00]>
 
 
 Format
@@ -266,7 +274,7 @@ Humanize relative to now:
 
 .. code-block:: python
 
-    >>> past = arrow.utcnow().replace(hours=-1)
+    >>> past = arrow.utcnow().shift(hours=-1)
     >>> past.humanize()
     'an hour ago'
 
@@ -275,7 +283,7 @@ Or another Arrow, or datetime:
 .. code-block:: python
 
     >>> present = arrow.utcnow()
-    >>> future = present.replace(hours=2)
+    >>> future = present.shift(hours=2)
     >>> future.humanize(present)
     'in 2 hours'
 
@@ -283,7 +291,7 @@ Support for a growing number of locales (see `locales.py` for supported language
 
 .. code-block:: python
 
-    >>> future = arrow.utcnow().replace(hours=1)
+    >>> future = arrow.utcnow().shift(hours=1)
     >>> future.humanize(a, locale='ru')
     'через 2 час(а,ов)'
 
@@ -355,7 +363,7 @@ Use factories to harness Arrow's module API for a custom Arrow-derived type.  Fi
     ...         xmas = arrow.Arrow(self.year, 12, 25)
     ...
     ...         if self > xmas:
-    ...             xmas = xmas.replace(years=1)
+    ...             xmas = xmas.shift(years=1)
     ...
     ...         return (xmas - self).days
 
@@ -364,7 +372,7 @@ Then get and use a factory for it:
 
 .. code-block:: python
 
-    >>> factory = arrow.Factory(CustomArrow)
+    >>> factory = arrow.ArrowFactory(CustomArrow)
     >>> custom = factory.utcnow()
     >>> custom
     >>> <CustomArrow [2013-05-27T23:35:35.533160+00:00]>
@@ -428,13 +436,11 @@ Use the following tokens in parsing and formatting.  Note that they're not the s
 +--------------------------------+--------------+-------------------------------------------+
 |                                |s             |0, 1, 2 ... 58, 59                         |
 +--------------------------------+--------------+-------------------------------------------+
-|**Sub-second**                  |SSS           |000, 001, 002 ... 998, 999                 |
+|**Sub-second**                  |S...          |0, 02, 003, 000006, 123123123123... [#t3]_ |
 +--------------------------------+--------------+-------------------------------------------+
-|                                |SS            |00, 01, 02 ... 98, 99                      |
+|**Timezone**                    |ZZZ           |Asia/Baku, Europe/Warsaw, GMT ... [#t4]_   |
 +--------------------------------+--------------+-------------------------------------------+
-|                                |S             |0, 1, 2 ... 8, 9                           |
-+--------------------------------+--------------+-------------------------------------------+
-|**Timezone**                    |ZZ            |-07:00, -06:00 ... +06:00, +07:00          |
+|                                |ZZ            |-07:00, -06:00 ... +06:00, +07:00          |
 +--------------------------------+--------------+-------------------------------------------+
 |                                |Z             |-0700, -0600 ... +0600, +0700              |
 +--------------------------------+--------------+-------------------------------------------+
@@ -445,6 +451,8 @@ Use the following tokens in parsing and formatting.  Note that they're not the s
 
 .. [#t1] localization support for parsing and formatting
 .. [#t2] localization support only for formatting
+.. [#t3] the result is truncated to microseconds, with `half-to-even rounding <https://en.wikipedia.org/wiki/IEEE_floating_point#Roundings_to_nearest>`_.
+.. [#t4] timezone names from `tz database <https://www.iana.org/time-zones>`_  provided via dateutil package
 
 ---------
 API Guide
